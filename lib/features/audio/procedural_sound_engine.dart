@@ -115,9 +115,11 @@ class ProceduralSoundEngine {
   void stopAll() {
     _activeMixVolumes.clear();
     _isPlaying = false;
-    try {
-      _audioChannel.invokeMethod<bool>('stopAllSounds');
-    } catch (_) {}
+    // MethodChannel failures are asynchronous in headless tests; consume them.
+    unawaited(_audioChannel.invokeMethod<bool>('stopAllSounds').then<void>(
+      (_) {},
+      onError: (Object _) {},
+    ));
   }
 
   Future<void> playCompletionChime() async {
