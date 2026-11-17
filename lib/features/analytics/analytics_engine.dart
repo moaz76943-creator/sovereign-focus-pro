@@ -9,6 +9,9 @@ class AnalyticsSummary {
   final List<int> next30DaysWorkload;
   final Map<String, int> dailyActivityHeatmap;
 
+  /// Number of cards due today, including overdue cards assigned to day zero.
+  int get dueTodayCount => next30DaysWorkload.isEmpty ? 0 : next30DaysWorkload.first;
+
   const AnalyticsSummary({
     required this.recordedFocusMinutes,
     required this.completedFocusSessions,
