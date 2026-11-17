@@ -1262,7 +1262,7 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
                       reviewedAtUtc: now,
                     );
                     setState(() {
-                      currentCard['fsrs'] = nextState.toJson();
+                      currentCard['fsrs'] = nextState.nextState.toJson();
                       _showQuestionOnly = true;
                       _lastDictationEval = null;
                       _dictationController.clear();
