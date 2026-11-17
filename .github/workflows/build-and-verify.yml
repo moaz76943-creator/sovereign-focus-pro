@@ -97,20 +97,12 @@ jobs:
             echo "$KEYSTORE_B64" | base64 -d > android/app/upload-keystore.jks
             ALIAS="${KEY_ALIAS:-upload}"
             KP="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
-            printf "storePassword=%s
-keyPassword=%s
-keyAlias=%s
-storeFile=upload-keystore.jks
-" "$KEYSTORE_PASSWORD" "$KP" "$ALIAS" > android/key.properties
+            printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload-keystore.jks\n" "$KEYSTORE_PASSWORD" "$KP" "$ALIAS" > android/key.properties
             echo "Using persistent GitHub Secrets keystore for release signing."
           else
             EPHEMERAL_PW=$(openssl rand -hex 16)
             keytool -genkey -v -keystore android/app/upload-keystore.jks               -keyalg RSA -keysize 2048 -validity 365               -alias ci_ephemeral -dname "CN=FocusStudioProCI, OU=Mobile, O=MoazCreator, L=Amman, C=JO"               -storepass "$EPHEMERAL_PW" -keypass "$EPHEMERAL_PW"
-            printf "storePassword=%s
-keyPassword=%s
-keyAlias=ci_ephemeral
-storeFile=upload-keystore.jks
-" "$EPHEMERAL_PW" "$EPHEMERAL_PW" > android/key.properties
+            printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=ci_ephemeral\nstoreFile=upload-keystore.jks\n" "$EPHEMERAL_PW" "$EPHEMERAL_PW" > android/key.properties
             echo "::warning::Using ephemeral CI keystore for test build. Add KEYSTORE_B64 and KEYSTORE_PASSWORD to GitHub Secrets before Google Play upload."
           fi
 
