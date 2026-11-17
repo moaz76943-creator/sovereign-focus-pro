@@ -80,6 +80,7 @@ void main() {
     expect(fieldsMap['headword'], 'sich erinnern');
     expect(fieldsMap['custom_etymology'], 'Old High German irinneron');
     expect(preservedMap['word'], 'sich erinnern');
+    await db.close();
   });
 
   test('AES-256-GCM encrypted backup round-trip and CSV/TSV UTF-8 validation', () async {
@@ -104,6 +105,8 @@ void main() {
       passphrase: 'Strong_Passphrase_2026!',
     );
 
+    await db1.close();
+
     final db2 = await AppDatabase.open(
       factory: databaseFactoryFfi,
       customPath: inMemoryDatabasePath,
@@ -123,5 +126,6 @@ void main() {
     expect(preview.isValid, isTrue);
     expect(preview.rowCount, 1);
     expect(preview.parsedRows.first['front'], 'الْعِلْمُ نُورٌ');
+    await db2.close();
   });
 }
