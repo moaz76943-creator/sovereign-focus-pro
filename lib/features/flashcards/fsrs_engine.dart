@@ -101,6 +101,9 @@ class FsrsReviewOutcome {
 }
 
 /// Deterministic FSRS-4.5 (17-parameter power-law forgetting curve) scheduler.
+/// Backward-compatible name used by the UI layer.
+typedef FsrsEngine = Fsrs45Engine;
+
 class Fsrs45Engine {
   static const List<double> defaultWeights = [
     0.4872, 1.4003, 3.7145, 13.8206,
