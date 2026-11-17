@@ -44,6 +44,36 @@ class LanguageQualityReportItem {
 class LanguageRegistry100 {
   static const Set<String> forbiddenLanguageCodes = {'he', 'iw', 'heb'};
 
+  /// Codes sourced from locales/registry_100.json (Hebrew intentionally excluded).
+  static const List<String> supportedCodes = [
+    'ar','en','de','fr','es','it','pt','ru','tr','nl','pl','sv','no','da','fi',
+    'el','cs','hu','ro','bg','uk','hr','sr','sk','sl','lt','lv','et','zh','ja',
+    'ko','hi','bn','ur','fa','id','ms','vi','th','tl','ta','te','mr','gu','kn',
+    'ml','pa','ne','si','my','km','lo','ka','hy','az','kk','uz','ky','tg','tk',
+    'mn','ps','ku','sd','ug','sw','am','ha','yo','ig','zu','xh','af','so','om',
+    'rw','sn','mg','ny','st','sq','bs','mk','is','ga','cy','gd','mt','eu','ca',
+    'gl','lb','be','eo','la','jv','su','ceb','mi','haw',
+  ];
+
+  static String sanitizeLanguageCode(String code) {
+    final normalized = code.trim().toLowerCase().replaceAll('_', '-').split('-').first;
+    if (forbiddenLanguageCodes.contains(normalized) || !supportedCodes.contains(normalized)) {
+      return 'ar';
+    }
+    return normalized;
+  }
+
+  /// Converts common non-Western decimal digit blocks to ASCII 0-9.
+  static String enforceWesternDigits(String input) {
+    const starts = [0x0660, 0x06F0, 0x0966, 0x09E6];
+    return String.fromCharCodes(input.runes.map((rune) {
+      for (final start in starts) {
+        if (rune >= start && rune <= start + 9) return 0x30 + rune - start;
+      }
+      return rune;
+    }));
+  }
+
   static const List<String> requiredUiKeys = [
     'app_title',
     'subtitle',
