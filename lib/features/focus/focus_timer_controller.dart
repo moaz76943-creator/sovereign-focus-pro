@@ -29,6 +29,9 @@ class FocusTimerState {
   final bool skipFinalRest;
   final List<String> exerciseSequence;
 
+  /// Compatibility alias for UI code that calls the rest phase a break.
+  bool get isBreakPhase => isRestPhase;
+
   const FocusTimerState({
     required this.mode,
     required this.workSeconds,
