@@ -7,8 +7,8 @@ import 'package:flutter/services.dart';
 /// via Native Android `MediaPlayer`, with rich multi-layered organic acoustic WAV
 /// synthesis over Native Android `AudioTrack` as an offline fallback.
 enum AmbientSoundPreset {
-  softRain(
-    id: 'soft_rain',
+  gentleRain(
+    id: 'gentle_rain',
     titleEn: 'Gentle Rain on Window (CC0)',
     titleAr: 'مطر هادئ على النافذة (طبيعي)',
     category: 'nature',
@@ -147,10 +147,10 @@ class ProceduralSoundEngine {
   /// Generates a clean, click-free, DC-centered 16-bit PCM WAV buffer.
   static Uint8List synthesizeCleanWav({
     required AmbientSoundPreset preset,
-    int durationSeconds = 2,
+    num durationSeconds = 2,
     double volume = 0.5,
   }) {
-    final int totalSamples = math.max(2048, durationSeconds * sampleRate);
+    final int totalSamples = math.max(2048, (durationSeconds * sampleRate).round());
     final pcmSamples = Float64List(totalSamples);
     final rnd = math.Random(42 + preset.index);
 
@@ -166,7 +166,7 @@ class ProceduralSoundEngine {
       double raw = 0.0;
 
       switch (preset) {
-        case AmbientSoundPreset.softRain:
+        case AmbientSoundPreset.gentleRain:
           final white = (rnd.nextDouble() * 2.0) - 1.0;
           lpState1 = (0.94 * lpState1) + (0.06 * white);
           lpState2 = (0.86 * lpState2) + (0.14 * lpState1);

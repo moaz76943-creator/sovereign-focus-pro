@@ -120,6 +120,19 @@ class FocusTimerController {
     );
   }
 
+  void selectMode(FocusSessionMode mode) {
+    _state = _state.copyWith(
+      mode: mode,
+      workSeconds: mode.defaultWorkSeconds,
+      restSeconds: mode.defaultRestSeconds,
+      totalSets: mode.defaultSets,
+      currentSet: 1,
+      remainingSeconds: mode.defaultWorkSeconds,
+      isRestPhase: false,
+      isRunning: false,
+    );
+  }
+
   void start() {
     _state = _state.copyWith(isRunning: true);
   }

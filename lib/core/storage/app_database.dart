@@ -4,7 +4,7 @@ import 'package:sqflite/sqflite.dart';
 
 class AppDatabase {
   static const String dbFileName = 'focus_studio_pro.db';
-  static const int currentSchemaVersion = 2;
+  static const int currentSchemaVersion = 3;
 
   final DatabaseExecutor _db;
 
@@ -121,11 +121,15 @@ class AppDatabase {
         )
       ''');
 
-      await db.insert('schema_migrations_log', {
-        'version': 1,
-        'applied_at_utc': DateTime.now().toUtc().toIso8601String(),
-        'notes': 'Initial non-destructive core schema for decks, templates, cards, FSRS logs, and TTS prefs.',
-      });
+      await db.insert(
+        'schema_migrations_log',
+        {
+          'version': 1,
+          'applied_at_utc': DateTime.now().toUtc().toIso8601String(),
+          'notes': 'Initial non-destructive core schema.',
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
     }
 
     if (fromVersion < 2 && toVersion >= 2) {
@@ -163,6 +167,64 @@ class AppDatabase {
         },
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
+    }
+
+    if (fromVersion < 3 && toVersion >= 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS notes_items (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          body TEXT NOT NULL DEFAULT '',
+          template_type TEXT NOT NULL DEFAULT 'feynman',
+          created_at_utc TEXT NOT NULL,
+          updated_at_utc TEXT NOT NULL
+        )
+      ''');
+
+      await db.insert(
+        'schema_migrations_log',
+        {
+          'version': 3,
+          'applied_at_utc': DateTime.now().toUtc().toIso8601String(),
+          'notes': 'Add dedicated notes_items table.',
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+  }
+
+  /// Safe non-destructive upsert (UPDATE if exists, INSERT otherwise) to avoid
+  /// SQLite REPLACE deleting parent rows and breaking FOREIGN KEY constraints.
+  static Future<void> _safeUpsert(
+    DatabaseExecutor exec,
+    String table,
+    String pkColumn,
+    Map<String, Object?> row,
+  ) async {
+    final pkVal = row[pkColumn];
+    if (pkVal == null) {
+      await exec.insert(table, row, conflictAlgorithm: ConflictAlgorithm.abort);
+      return;
+    }
+    final existing = await exec.query(
+      table,
+      columns: [pkColumn],
+      where: '$pkColumn = ?',
+      whereArgs: [pkVal],
+      limit: 1,
+    );
+    if (existing.isEmpty) {
+      await exec.insert(table, row, conflictAlgorithm: ConflictAlgorithm.abort);
+    } else {
+      final updateMap = Map<String, Object?>.from(row)..remove(pkColumn);
+      if (updateMap.isNotEmpty) {
+        await exec.update(
+          table,
+          updateMap,
+          where: '$pkColumn = ?',
+          whereArgs: [pkVal],
+        );
+      }
     }
   }
 
@@ -205,18 +267,14 @@ class AppDatabase {
     Map<String, String> renamedFieldsMap = const {},
   }) async {
     final now = DateTime.now().toUtc().toIso8601String();
-    await _db.insert(
-      'card_templates',
-      {
-        'id': templateId,
-        'name': name,
-        'fields_json': jsonEncode(fields),
-        'question_side_fields_json': jsonEncode(questionSideFields),
-        'answer_side_fields_json': jsonEncode(answerSideFields),
-        'updated_at_utc': now,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await _safeUpsert(_db, 'card_templates', 'id', {
+      'id': templateId,
+      'name': name,
+      'fields_json': jsonEncode(fields),
+      'question_side_fields_json': jsonEncode(questionSideFields),
+      'answer_side_fields_json': jsonEncode(answerSideFields),
+      'updated_at_utc': now,
+    });
 
     if (renamedFieldsMap.isNotEmpty) {
       final existingCards = await _db.query(
@@ -252,11 +310,11 @@ class AppDatabase {
   }
 
   Future<void> upsertDeck(Map<String, Object?> deckRow) async {
-    await _db.insert('decks', deckRow, conflictAlgorithm: ConflictAlgorithm.replace);
+    await _safeUpsert(_db, 'decks', 'id', deckRow);
   }
 
   Future<void> upsertCard(Map<String, Object?> cardRow) async {
-    await _db.insert('cards', cardRow, conflictAlgorithm: ConflictAlgorithm.replace);
+    await _safeUpsert(_db, 'cards', 'id', cardRow);
   }
 
   Future<void> deleteById(String table, String id) async {
@@ -264,11 +322,15 @@ class AppDatabase {
   }
 
   Future<void> upsertTaskItem(Map<String, Object?> taskRow) async {
-    await _db.insert('tasks_items', taskRow, conflictAlgorithm: ConflictAlgorithm.replace);
+    await _safeUpsert(_db, 'tasks_items', 'id', taskRow);
+  }
+
+  Future<void> upsertNoteItem(Map<String, Object?> noteRow) async {
+    await _safeUpsert(_db, 'notes_items', 'id', noteRow);
   }
 
   Future<void> insertFocusSession(Map<String, Object?> sessionRow) async {
-    await _db.insert('focus_sessions', sessionRow, conflictAlgorithm: ConflictAlgorithm.replace);
+    await _safeUpsert(_db, 'focus_sessions', 'id', sessionRow);
   }
 
   Future<void> insertReviewLog(Map<String, Object?> logRow) async {
@@ -290,31 +352,35 @@ class AppDatabase {
       'tts_preferences': await queryAll('tts_preferences'),
       'focus_sessions': await queryAll('focus_sessions'),
       'tasks_items': await queryAll('tasks_items'),
+      'notes_items': await queryAll('notes_items'),
     };
   }
 
   Future<void> restoreSnapshotAtomically(Map<String, dynamic> snapshot) async {
     final db = _db as Database;
+    final tablePk = {
+      'decks': 'id',
+      'card_templates': 'id',
+      'cards': 'id',
+      'review_logs': 'event_id',
+      'tts_preferences': 'language_code',
+      'focus_sessions': 'id',
+      'tasks_items': 'id',
+      'notes_items': 'id',
+    };
     await db.transaction((txn) async {
-      for (final table in [
-        'decks',
-        'card_templates',
-        'cards',
-        'review_logs',
-        'tts_preferences',
-        'focus_sessions',
-        'tasks_items',
-      ]) {
-        final rows = snapshot[table];
+      for (final entry in tablePk.entries) {
+        final rows = snapshot[entry.key];
         if (rows is List) {
           for (final item in rows) {
             if (item is! Map) {
-              throw FormatException('Invalid row in table $table');
+              throw FormatException('Invalid row in table ${entry.key}');
             }
-            await txn.insert(
-              table,
+            await _safeUpsert(
+              txn,
+              entry.key,
+              entry.value,
               Map<String, Object?>.from(item),
-              conflictAlgorithm: ConflictAlgorithm.replace,
             );
           }
         }

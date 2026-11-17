@@ -303,6 +303,7 @@ public class MainActivity extends FlutterActivity {
 
     private String mapSoundIdToAssetFile(String soundId) {
         switch (soundId) {
+            case "gentle_rain":
             case "soft_rain":
                 return "rain_window.ogg";
             case "forest_wind":

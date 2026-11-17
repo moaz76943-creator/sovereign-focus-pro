@@ -20,7 +20,7 @@ class ImportPreviewResult {
 }
 
 class BackupService {
-  static const int _pbkdf2Iterations = 60000;
+  static const int _pbkdf2Iterations = 210000;
   static const String _envelopeMagic = 'FOCUS_STUDIO_PRO_AES256GCM_V1';
 
   static Future<String> createEncryptedBackup({

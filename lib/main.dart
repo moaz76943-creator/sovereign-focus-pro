@@ -295,38 +295,41 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
       final savedTasks = await db.queryAll('tasks_items');
       if (savedTasks.isNotEmpty) {
         final tList = <Map<String, dynamic>>[];
-        final nList = <Map<String, String>>[];
         for (final r in savedTasks) {
-          final idStr = r['id'].toString();
-          if (idStr.startsWith('note_')) {
-            nList.add({
-              'id': idStr,
-              'title_ar': (r['title'] ?? '').toString(),
-              'title_en': (r['title'] ?? '').toString(),
-              'body_ar': (r['notes'] ?? '').toString(),
-              'body_en': (r['notes'] ?? '').toString(),
-            });
-          } else {
-            tList.add({
-              'id': idStr,
-              'title_ar': (r['title'] ?? '').toString(),
-              'title_en': (r['notes'] ?? r['title'] ?? '').toString(),
-              'priority': 'high',
-              'pomodoros': 1,
-              'done': (r['completed'] as int? ?? 0) == 1,
-            });
-          }
-        }
-        if (mounted) {
-          setState(() {
-            if (tList.isNotEmpty) _tasks = tList;
-            if (nList.isNotEmpty) _notes = nList;
+          tList.add({
+            'id': r['id'].toString(),
+            'title_ar': (r['title'] ?? '').toString(),
+            'title_en': (r['notes'] ?? r['title'] ?? '').toString(),
+            'priority': 'high',
+            'pomodoros': 1,
+            'done': (r['completed'] as int? ?? 0) == 1,
           });
+        }
+        if (mounted && tList.isNotEmpty) {
+          setState(() => _tasks = tList);
         }
       } else {
         for (final t in _tasks) {
           await _persistTaskToDb(t);
         }
+      }
+
+      final savedNotes = await db.queryAll('notes_items');
+      if (savedNotes.isNotEmpty) {
+        final nList = <Map<String, String>>[];
+        for (final r in savedNotes) {
+          nList.add({
+            'id': r['id'].toString(),
+            'title_ar': (r['title'] ?? '').toString(),
+            'title_en': (r['title'] ?? '').toString(),
+            'body_ar': (r['body'] ?? '').toString(),
+            'body_en': (r['body'] ?? '').toString(),
+          });
+        }
+        if (mounted && nList.isNotEmpty) {
+          setState(() => _notes = nList);
+        }
+      } else {
         for (final n in _notes) {
           await _persistNoteToDb(n);
         }
@@ -387,16 +390,11 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
     if (db == null) return;
     try {
       final nowIso = DateTime.now().toUtc().toIso8601String();
-      final noteId = note['id']!.startsWith('note_')
-          ? note['id']!
-          : 'note_${note['id']}';
-      await db.upsertTaskItem({
-        'id': noteId,
+      await db.upsertNoteItem({
+        'id': note['id'].toString(),
         'title': (note['title_ar'] ?? note['title_en'] ?? '').toString(),
-        'notes': (note['body_ar'] ?? note['body_en'] ?? '').toString(),
-        'due_date_utc': null,
-        'completed': 0,
-        'priority': 2,
+        'body': (note['body_ar'] ?? note['body_en'] ?? '').toString(),
+        'template_type': 'feynman',
         'created_at_utc': nowIso,
         'updated_at_utc': nowIso,
       });
@@ -409,12 +407,12 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
       _liveSecondTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (!mounted) return;
         final prevSet = _timerController.state.currentSet;
-        final prevBreak = _timerController.state.isBreakPhase;
+        final prevRest = _timerController.state.isBreakPhase;
         setState(() {
           _timerController.tick(1);
         });
         if (_timerController.state.currentSet != prevSet ||
-            _timerController.state.isBreakPhase != prevBreak) {
+            _timerController.state.isBreakPhase != prevRest) {
           _completedFocusDurationsSeconds.add(1500);
           _soundEngine.playCompletionChime();
         }
@@ -597,7 +595,7 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
                                     FocusSessionMode.deepWork50);
                               } else {
                                 _timerController.selectMode(
-                                    FocusSessionMode.pomodoro25);
+                                    FocusSessionMode.pomodoro);
                               }
                             });
                             Navigator.of(ctx).pop();
@@ -787,7 +785,7 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
     final isAr = s.languageCode == 'ar';
     final totalSec = st.mode == FocusSessionMode.deepWork50
         ? 50 * 60
-        : (st.mode == FocusSessionMode.custom ? 10 * 60 : 25 * 60);
+        : (st.mode == FocusSessionMode.quickSprint10 ? 10 * 60 : 25 * 60);
     final progress = totalSec > 0
         ? (1.0 - (st.remainingSeconds / totalSec)).clamp(0.0, 1.0)
         : 0.0;
@@ -807,9 +805,9 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
                   children: [
                     ChoiceChip(
                       label: const Text('25:00'),
-                      selected: st.mode == FocusSessionMode.pomodoro25,
+                      selected: st.mode == FocusSessionMode.pomodoro,
                       onSelected: (_) => setState(() {
-                        _timerController.selectMode(FocusSessionMode.pomodoro25);
+                        _timerController.selectMode(FocusSessionMode.pomodoro);
                         _syncLiveTimerTicker();
                       }),
                     ),
@@ -823,14 +821,9 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
                     ),
                     ChoiceChip(
                       label: const Text('10:00'),
-                      selected: st.mode == FocusSessionMode.custom,
+                      selected: st.mode == FocusSessionMode.quickSprint10,
                       onSelected: (_) => setState(() {
-                        _timerController.configureCustom(
-                          focusMinutes: 10,
-                          shortBreakMinutes: 2,
-                          longBreakMinutes: 5,
-                          totalSets: 3,
-                        );
+                        _timerController.selectMode(FocusSessionMode.quickSprint10);
                         _syncLiveTimerTicker();
                       }),
                     ),
@@ -993,10 +986,9 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
               final ts = int.tryParse(setsCtrl.text.trim()) ?? 4;
               setState(() {
                 _timerController.configureCustom(
-                  focusMinutes: fm,
-                  shortBreakMinutes: bm,
-                  longBreakMinutes: bm * 2,
-                  totalSets: ts,
+                  sets: ts,
+                  workSeconds: fm * 60,
+                  restSeconds: bm * 60,
                 );
                 _syncLiveTimerTicker();
               });
@@ -1510,7 +1502,11 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
               ),
               secondary: IconButton(
                 icon: const Icon(Icons.delete_outline, size: 20),
-                onPressed: () => setState(() => _tasks.removeAt(i)),
+                onPressed: () {
+                  final delId = _tasks[i]['id'].toString();
+                  setState(() => _tasks.removeAt(i));
+                  _db?.deleteById('tasks_items', delId);
+                },
               ),
               onChanged: (v) {
                 setState(() => _tasks[i]['done'] = v ?? false);
@@ -1556,7 +1552,11 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
               ),
               trailing: IconButton(
                 icon: const Icon(Icons.delete_outline, size: 20),
-                onPressed: () => setState(() => _notes.removeAt(j)),
+                onPressed: () {
+                  final delId = _notes[j]['id'].toString();
+                  setState(() => _notes.removeAt(j));
+                  _db?.deleteById('notes_items', delId);
+                },
               ),
             ),
           ),
@@ -1897,12 +1897,13 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
               onPressed: () async {
                 Navigator.of(ctx).pop();
                 try {
-                  final snapshot = _db != null
-                      ? await _db!.exportFullSnapshot()
-                      : {'cards': _cards, 'tasks': _tasks, 'notes': _notes};
+                  if (_db == null) {
+                    _showSnack(isAr ? 'قاعدة البيانات غير جاهزة' : 'Database not ready');
+                    return;
+                  }
                   final encryptedJson =
                       await BackupService.createEncryptedBackup(
-                    snapshot: snapshot,
+                    db: _db!,
                     passphrase: passCtrl.text.trim(),
                   );
                   await _safChannel.invokeMethod<String>('saveDocument', {
@@ -1968,9 +1969,9 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
                       rawContent.trim().isNotEmpty &&
                       _db != null) {
                     await BackupService.restoreEncryptedBackup(
+                      db: _db!,
                       encryptedPayload: rawContent.trim(),
                       passphrase: passCtrl.text.trim(),
-                      database: _db!,
                     );
                     await _initPersistentDatabase();
                     _showSnack(

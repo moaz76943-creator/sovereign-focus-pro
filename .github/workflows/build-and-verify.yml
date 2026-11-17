@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: build-verify-${{ github.ref }}
-  cancel-in-progress: true
+  group: build-verify-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   verify_and_build:
@@ -50,9 +50,10 @@ jobs:
       - name: Install Linux SQLite FFI dependencies for unit tests
         run: sudo apt-get update && sudo apt-get install -y libsqlite3-0 libsqlite3-dev
 
-      - name: Set up Flutter Stable
+      - name: Set up Pinned Flutter Stable (3.27.4)
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.27.4'
           channel: 'stable'
           cache: true
 
@@ -79,22 +80,49 @@ jobs:
           rm -rf android/app/src/main/kotlin || true
           rm -f test/widget_test.dart || true
 
-      - name: Generate Production Release Signing Keystore for APK & Play AAB
-        run: |
-          keytool -genkey -v -keystore android/app/upload-keystore.jks             -keyalg RSA -keysize 2048 -validity 10000             -alias upload -dname "CN=FocusStudioPro, OU=Mobile, O=MoazCreator, L=Amman, S=Amman, C=JO"             -storepass FocusStudioRelease2026! -keypass FocusStudioRelease2026!
-          printf "storePassword=FocusStudioRelease2026!\nkeyPassword=FocusStudioRelease2026!\nkeyAlias=upload\nstoreFile=upload-keystore.jks\n" > android/key.properties
-
       - name: Install Dart/Flutter dependencies
         run: flutter pub get
 
-      - name: Run Full Automated Test Suite (Storage, AES Backup, FSRS-4.5, TTS, Audio, UI, 100 Languages, Shield, Guardian)
+      - name: Run Full Automated Test Suite (Before Keystore Generation)
         run: flutter test
+
+      - name: Configure Release Signing (Secrets Preferred, Ephemeral CI Fallback)
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > android/app/upload-keystore.jks
+            ALIAS="${KEY_ALIAS:-upload}"
+            KP="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+            printf "storePassword=%s
+keyPassword=%s
+keyAlias=%s
+storeFile=upload-keystore.jks
+" "$KEYSTORE_PASSWORD" "$KP" "$ALIAS" > android/key.properties
+            echo "Using persistent GitHub Secrets keystore for release signing."
+          else
+            EPHEMERAL_PW=$(openssl rand -hex 16)
+            keytool -genkey -v -keystore android/app/upload-keystore.jks               -keyalg RSA -keysize 2048 -validity 365               -alias ci_ephemeral -dname "CN=FocusStudioProCI, OU=Mobile, O=MoazCreator, L=Amman, C=JO"               -storepass "$EPHEMERAL_PW" -keypass "$EPHEMERAL_PW"
+            printf "storePassword=%s
+keyPassword=%s
+keyAlias=ci_ephemeral
+storeFile=upload-keystore.jks
+" "$EPHEMERAL_PW" "$EPHEMERAL_PW" > android/key.properties
+            echo "::warning::Using ephemeral CI keystore for test build. Add KEYSTORE_B64 and KEYSTORE_PASSWORD to GitHub Secrets before Google Play upload."
+          fi
 
       - name: Build Signed Release APK (Android 15, API 35, 120Hz, R8)
         run: flutter build apk --release
 
-      - name: Build Signed Play Store Release App Bundle (AAB)
+      - name: Build Signed Release App Bundle (AAB)
         run: flutter build appbundle --release
+
+      - name: Clean Up Temporary Signing Files
+        if: always()
+        run: rm -f android/app/upload-keystore.jks android/key.properties
 
       - name: Package Release Artifacts
         run: |
