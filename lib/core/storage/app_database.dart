@@ -341,6 +341,12 @@ class AppDatabase {
     return _db.query(table);
   }
 
+  /// Closes this database handle so tests and short-lived tools can isolate sessions.
+  Future<void> close() async {
+    final executor = _db;
+    if (executor is Database) await executor.close();
+  }
+
   Future<Map<String, dynamic>> exportFullSnapshot() async {
     return {
       'schema_version': currentSchemaVersion,
