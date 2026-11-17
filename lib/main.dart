@@ -1259,7 +1259,7 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
                     final nextState = _fsrs.review(
                       current: prevState,
                       rating: entry.$1,
-                      nowUtc: now,
+                      reviewedAtUtc: now,
                     );
                     setState(() {
                       currentCard['fsrs'] = nextState.toJson();
