@@ -43,6 +43,9 @@ class FlashcardTextUtils {
     return s.replaceAll(RegExp(r'\s+'), ' ');
   }
 
+  static bool matchesSearch(String sourceText, String query) =>
+      matchesArabicInsensitive(sourceText, query);
+
   static bool matchesArabicInsensitive(String sourceText, String query) {
     final normSource = normalizeForSearch(sourceText);
     final normQuery = normalizeForSearch(query);
