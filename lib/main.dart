@@ -259,7 +259,7 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
       final db = await AppDatabase.open();
       _db = db;
       await db.ensureDefaultDeckAndTemplate();
-      await SelfHealingGuardian.runFullDiagnosticAndHeal(db: db);
+      await SelfHealingGuardian.runFullDiagnosticAndHeal(db: db, soundEngine: _soundEngine);
 
       final savedCards = await db.queryAll('cards');
       if (savedCards.isNotEmpty) {
@@ -1785,7 +1785,7 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
             onTap: () async {
               if (_db != null) {
                 final rep =
-                    await SelfHealingGuardian.runFullDiagnosticAndHeal(db: _db!);
+                    await SelfHealingGuardian.runFullDiagnosticAndHeal(db: _db!, soundEngine: _soundEngine);
                 _showSnack(
                   isAr
                       ? 'الفحص الذاتي سليم 100% (تم تدقيق ${rep.subsystems.length} أنظمة)'
