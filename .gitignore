@@ -1,0 +1,17 @@
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+.env
+.env.*
+google_keys.list
+**/key.properties
+**/google-services.json
+local.properties
+build/
+.dart_tool/
+.flutter-plugins*
+artifacts/
+*.apk
+*.aab

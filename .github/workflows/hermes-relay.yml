@@ -1,0 +1,87 @@
+name: Focus Studio Pro Autonomous Relay
+
+on:
+  workflow_dispatch:
+    inputs:
+      hop:
+        description: "Current relay hop"
+        default: "1"
+      max_hops:
+        description: "Maximum relay hops"
+        default: "10"
+  schedule:
+    - cron: '25 0,8 * * *'
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: fsp-hermes-relay-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  autonomous_engineering:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Hermes Agent
+        run: |
+          curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive --skip-browser --skip-computer-use
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run Autonomous Engineering Cycle with Multi-Provider Fallback
+        if: always()
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          GOOGLE_KEYS_LIST: ${{ secrets.GOOGLE_KEYS_LIST }}
+        run: |
+          printf '%s\n' "$GOOGLE_KEYS_LIST" > /tmp/keys.list
+          PROMPT="Follow AGENTS.md, state/tasks_registry.json, and state/checkpoint.json strictly. Run python3 tools/pre_commit_shield.py before and after any edits. Inspect CI status, fix any build/test/UX issues, enhance modular studios/flashcards/TTS/audio without breaking existing tests, and update REPORT.md."
+          DONE=0
+
+          if [ -n "${OPENROUTER_API_KEY:-}" ]; then
+            if timeout 240m hermes chat --cli --yolo --oneshot -m "openrouter/free" -q "$PROMPT"; then
+              DONE=1
+            fi
+          fi
+
+          if [ "$DONE" -eq 0 ] && [ -n "${NVIDIA_API_KEY:-}" ]; then
+            for NV_MODEL in "nvidia/nemotron-3-ultra-550b-a55b" "deepseek-ai/deepseek-v4.1-flash"; do
+              if timeout 240m hermes chat --cli --yolo --oneshot --provider nvidia -m "$NV_MODEL" -q "$PROMPT"; then
+                DONE=1
+                break
+              fi
+            done
+          fi
+
+          if [ "$DONE" -eq 0 ]; then
+            for MODEL in "gemini-3.5-flash-lite" "gemini-2.5-flash"; do
+              while IFS= read -r K; do
+                [ -n "$K" ] || continue
+                if GEMINI_API_KEY="$K" GOOGLE_API_KEY="$K" timeout 240m hermes chat --cli --yolo --oneshot --provider gemini -m "$MODEL" -q "$PROMPT"; then
+                  DONE=1
+                  break 2
+                fi
+              done < /tmp/keys.list
+            done
+          fi
+          rm -f /tmp/keys.list
+
+      - name: Verify Shield & Push Changes Safely
+        if: always()
+        run: |
+          python3 tools/pre_commit_shield.py
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore(agent): autonomous relay checkpoint"
+            git push origin main
+          fi

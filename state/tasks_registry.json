@@ -1,0 +1,20 @@
+{
+  "project": "moaz76943-creator/sovereign-focus-pro",
+  "current_stage": 13,
+  "total_stages": 13,
+  "tasks": [
+    {"id": "S1", "title": "Clean public repo, modular structure & Gitleaks gate", "status": "COMPLETED"},
+    {"id": "S2", "title": "Android 15 WindowInsets, SQLite WAL migrations & AES-256-GCM backup", "status": "COMPLETED"},
+    {"id": "S3", "title": "FSRS-4.5 flashcards engine & flexible templates", "status": "COMPLETED"},
+    {"id": "S4", "title": "Native Android TTS engine & per-language voice discovery", "status": "COMPLETED"},
+    {"id": "S5", "title": "Real CC0 Nature Audio + Native Android MediaPlayer/AudioTrack Mixer & Focus Timer", "status": "COMPLETED"},
+    {"id": "S6", "title": "Calm AMOLED 120Hz UI, Tasks, Notes, Analytics & 10 Studios", "status": "COMPLETED"},
+    {"id": "S7", "title": "Languages batch 1 (1-35) full UI coverage & QA", "status": "COMPLETED"},
+    {"id": "S8", "title": "Languages batch 2 (36-70) full UI coverage & QA", "status": "COMPLETED"},
+    {"id": "S9", "title": "Languages batch 3 (71-100, no Hebrew, Western digits 0-9) & RTL/LTR QA", "status": "COMPLETED"},
+    {"id": "S10", "title": "SafeFeatureBus fault-isolated plugin architecture", "status": "COMPLETED"},
+    {"id": "S11", "title": "Pre-commit & CI 100-language & zero-secret shield", "status": "COMPLETED"},
+    {"id": "S12", "title": "Self-Healing Guardian, 4 Active Recall Modes & Play Store Kit", "status": "COMPLETED"},
+    {"id": "S13", "title": "Full SQLite/AudioTrack/SAF/Live-Timer UI wiring & AGP 8.7.3 R8 Release Hardening", "status": "COMPLETED"}
+  ]
+}
