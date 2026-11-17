@@ -5,7 +5,9 @@ enum StudyModeType {
   standardFlip('flip', 'Standard Flip Review', 'المراجعة القياسية بالقلب'),
   typingDictation('dictation', 'Exact Typing & Dictation', 'وضع الإملاء والكتابة الدقيقة'),
   multipleChoiceQuiz('quiz', '4-Option Speed Quiz', 'اختبار الاختيار من متعدد السريع'),
-  leechClinic('leech', 'Difficult & Leech Card Clinic', 'عيادة البطاقات الصعبة والمتعثرة');
+  leechClinic('leech', 'Difficult & Leech Card Clinic', 'عيادة البطاقات الصعبة والمتعثرة'),
+  clozeDeletion('cloze', 'Cloze Deletion', 'إخفاء الكلمة من الجملة'),
+  typeAnswer('type_answer', 'Type the Answer', 'اكتب الإجابة');
 
   final String id;
   final String titleEn;
@@ -20,6 +22,8 @@ class DictationEvaluation {
   final double similarityScore;
   final FsrsRating suggestedRating;
 
+  bool get passed => exactMatch || normalizedMatch || similarityScore >= 0.92;
+
   const DictationEvaluation({
     required this.exactMatch,
     required this.normalizedMatch,
@@ -32,6 +36,19 @@ class DictationEvaluation {
 /// Evaluates typed user answers with Arabic diacritic-insensitive matching
 /// and recommends an objective FSRS-4.5 rating.
 class ActiveRecallModesEngine {
+  static String generateClozePrompt({
+    required String fullSentence,
+    required String targetTerm,
+  }) {
+    final term = targetTerm.trim();
+    if (term.isEmpty) return fullSentence;
+    final index = fullSentence.toLowerCase().indexOf(term.toLowerCase());
+    if (index < 0) return fullSentence;
+    return fullSentence.substring(0, index) +
+        ('_' * term.length) +
+        fullSentence.substring(index + term.length);
+  }
+
   static DictationEvaluation evaluateTypedAnswer({
     required String expectedAnswer,
     required String userTypedAnswer,
